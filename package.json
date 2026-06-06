@@ -32,7 +32,8 @@
     "build": "tsc && vite build",
     "test": "npm run build && npm run test:printer",
     "test:printer": "node scripts/test-printer.js",
-    "electron:build": "electron-builder"
+    "electron:build": "electron-builder",
+    "rebuild:electron": "npm rebuild better-sqlite3 --runtime=electron --target=29.4.6 --dist-url=https://electronjs.org/headers"
   },
   "dependencies": {
     "@types/qrcode": "^1.5.6",
