@@ -18,6 +18,30 @@ function requireToken(req, res, next) {
   const auth = req.headers.authorization || '';
   const queryToken = req.query.token || '';
   if (auth === `Bearer ${syncToken}` || queryToken === syncToken) return next();
+  if (req.method === 'GET' && req.path === '/') {
+    return res.status(401).type('html').send(`<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard Terkunci</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: system-ui, sans-serif; background: #f5f7f9; color: #17202a; padding: 20px; }
+    main { max-width: 420px; background: #fff; border: 1px solid #dfe5eb; border-radius: 8px; padding: 22px; }
+    h1 { margin: 0 0 10px; font-size: 20px; }
+    p { color: #637381; line-height: 1.5; }
+    code { background: #eef2f6; padding: 2px 5px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Dashboard terkunci</h1>
+    <p>Tambahkan token akses pada URL dashboard.</p>
+    <p><code>/?token=TOKEN_ANDA</code></p>
+  </main>
+</body>
+</html>`);
+  }
   return res.status(401).json({ error: 'Token tidak valid.' });
 }
 
@@ -269,7 +293,7 @@ async function getDashboardData(date, requestedShiftId) {
   `, [selectedShiftId]);
 
   const bestItems = await pool.query(`
-    SELECT product_sku, product_name, SUM(quantity) as total_qty, SUM(subtotal) as total_sales
+    SELECT si.product_sku, si.product_name, SUM(si.quantity) as total_qty, SUM(si.subtotal) as total_sales
     FROM sale_items si
     JOIN sales s ON s.invoice_number = si.invoice_number
     WHERE s.local_shift_id = $1

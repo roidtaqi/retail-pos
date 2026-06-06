@@ -644,6 +644,43 @@ export default function App() {
     setActiveModal('num_pay');
   };
 
+  const handleSyncNow = async () => {
+    try {
+      const res = await (window as any).api.sync.syncNow();
+      if (!res.success) {
+        alert(res.error || res.message || 'Sinkronisasi gagal.');
+        return;
+      }
+      alert(
+        `${res.message || 'Sinkronisasi selesai.'}\n\n` +
+        `Dicoba: ${res.attempted ?? 0}\n` +
+        `Berhasil: ${res.completed ?? 0}\n` +
+        `Pending: ${res.pending ?? 0}\n` +
+        `Gagal: ${res.failed ?? 0}`
+      );
+    } catch (err: any) {
+      alert(err.message || 'Sinkronisasi gagal.');
+    }
+  };
+
+  const handleQueueFullResync = async () => {
+    const ok = window.confirm('Kirim ulang semua shift dan transaksi lokal ke cloud? Data di cloud akan di-update berdasarkan invoice/shift, bukan menghapus database lokal.');
+    if (!ok) return;
+
+    try {
+      const res = await (window as any).api.sync.queueFullResync();
+      if (!res.success) {
+        alert(res.error || res.message || 'Gagal membuat antrean kirim ulang.');
+        return;
+      }
+
+      alert(`${res.message || 'Data lama masuk antrean.'}\n\nSetelah ini aplikasi akan menjalankan Sync Queue.`);
+      await handleSyncNow();
+    } catch (err: any) {
+      alert(err.message || 'Gagal membuat antrean kirim ulang.');
+    }
+  };
+
   // Bulk Product CSV import
   const handleImportCsv = async () => {
     if (!csvText.trim()) {
@@ -743,10 +780,7 @@ export default function App() {
             </div>
 
             <button 
-              onClick={async () => {
-                const res = await (window as any).api.sync.syncNow();
-                if (!res.success) alert(res.error);
-              }}
+              onClick={handleSyncNow}
               className="btn-soft" 
               style={{ padding: '6px 12px', fontSize: '0.78rem', gap: 4 }}
               disabled={!isOnline || isSyncing}
@@ -1006,13 +1040,18 @@ export default function App() {
               
               <button 
                 className="btn-soft operational-menu-button" 
-                onClick={async () => {
-                  const res = await (window as any).api.sync.syncNow();
-                  if (!res.success) alert(res.error);
-                }}
+                onClick={handleSyncNow}
               >
                 <RefreshCw size={18} color="var(--text-color)" />
                 <span style={{ fontSize: '0.75rem', fontWeight: 800 }}>Sync Queue</span>
+              </button>
+
+              <button 
+                className="btn-soft operational-menu-button" 
+                onClick={handleQueueFullResync}
+              >
+                <RefreshCw size={18} color="#0ea5e9" />
+                <span style={{ fontSize: '0.75rem', fontWeight: 800 }}>Kirim Ulang Cloud</span>
               </button>
             </div>
             

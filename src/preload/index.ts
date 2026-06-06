@@ -29,6 +29,12 @@ async function invokeLegacy(channel: string, ...args: any[]) {
     }
     return { success: true, data };
   }
+  if (response && typeof response === 'object' && response.success === false) {
+    return {
+      ...response,
+      error: response.error || response.message || 'IPC request failed'
+    };
+  }
   return response;
 }
 
@@ -70,6 +76,7 @@ contextBridge.exposeInMainWorld('api', {
   sync: {
     getStatus: () => invokeData('sync:getStatus'),
     syncNow: () => invokeLegacy('sync:syncNow'),
+    queueFullResync: () => invokeLegacy('sync:queueFullResync'),
     toggleNetwork: (forceState?: boolean) => invokeData('sync:toggleNetwork', forceState),
     onStatusChange: (callback: (data: any) => void) => {
       const subscription = (_event: any, data: any) => callback(data);
