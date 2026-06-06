@@ -1,0 +1,60 @@
+{
+  "name": "retail-pos",
+  "version": "1.0.0",
+  "author": {
+    "name": "Roid Taqi",
+    "email": "roid@example.com"
+  },
+  "homepage": "https://github.com/roidtaqi/retail-pos",
+  "description": "Offline-First Retail POS (Kasir) Desktop Application",
+  "main": "dist-electron/main/index.js",
+  "type": "module",
+  "build": {
+    "appId": "com.retailpos.app",
+    "productName": "Retail POS",
+    "directories": {
+      "output": "release"
+    },
+    "linux": {
+      "target": [
+        "deb"
+      ],
+      "category": "Office"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    }
+  },
+  "scripts": {
+    "dev": "env -u ELECTRON_RUN_AS_NODE vite",
+    "build": "tsc && vite build",
+    "test": "npm run build && npm run test:printer",
+    "test:printer": "node scripts/test-printer.js",
+    "electron:build": "electron-builder"
+  },
+  "dependencies": {
+    "@types/qrcode": "^1.5.6",
+    "better-sqlite3": "^9.4.3",
+    "escpos": "^3.0.0-alpha.6",
+    "lucide-react": "^0.344.0",
+    "pdfkit": "^0.18.0",
+    "qrcode": "^1.5.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.9",
+    "@types/node": "^20.11.20",
+    "@types/react": "^18.2.55",
+    "@types/react-dom": "^18.2.19",
+    "@vitejs/plugin-react": "^4.2.1",
+    "electron": "^29.1.0",
+    "electron-builder": "^24.13.3",
+    "typescript": "^5.3.3",
+    "vite": "^5.1.4",
+    "vite-plugin-electron": "^0.28.2",
+    "vite-plugin-electron-renderer": "^0.14.5"
+  }
+}
