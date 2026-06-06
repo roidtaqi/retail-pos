@@ -1,10 +1,15 @@
 import express from 'express';
 import pg from 'pg';
+import crypto from 'crypto';
 
 const { Pool } = pg;
 const app = express();
 const port = Number(process.env.PORT || 3000);
 const syncToken = process.env.SYNC_TOKEN || '';
+const adminUsername = process.env.ADMIN_USERNAME || 'admin';
+const adminPassword = process.env.ADMIN_PASSWORD || process.env.DASHBOARD_PASSWORD || syncToken;
+const sessionSecret = process.env.SESSION_SECRET || syncToken || adminPassword;
+const sessionCookieName = 'retail_pos_admin';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -12,37 +17,112 @@ const pool = new Pool({
 });
 
 app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: false }));
 
-function requireToken(req, res, next) {
-  if (!syncToken) return next();
-  const auth = req.headers.authorization || '';
-  const queryToken = req.query.token || '';
-  if (auth === `Bearer ${syncToken}` || queryToken === syncToken) return next();
-  if (req.method === 'GET' && req.path === '/') {
-    return res.status(401).type('html').send(`<!doctype html>
+function getCookie(req, name) {
+  const cookies = req.headers.cookie || '';
+  return cookies
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${name}=`))
+    ?.slice(name.length + 1) || '';
+}
+
+function signSession(value) {
+  return crypto.createHmac('sha256', sessionSecret).update(value).digest('hex');
+}
+
+function createSessionValue(username) {
+  const payload = Buffer.from(JSON.stringify({
+    username,
+    exp: Date.now() + 1000 * 60 * 60 * 24
+  })).toString('base64url');
+  return `${payload}.${signSession(payload)}`;
+}
+
+function readSession(req) {
+  const value = getCookie(req, sessionCookieName);
+  const [payload, signature] = value.split('.');
+  if (!payload || !signature || signature !== signSession(payload)) return null;
+
+  try {
+    const session = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (!session?.username || !session?.exp || session.exp < Date.now()) return null;
+    return session;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function setSessionCookie(res, username) {
+  res.cookie(sessionCookieName, createSessionValue(username), {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',
+    maxAge: 1000 * 60 * 60 * 24
+  });
+}
+
+function clearSessionCookie(res) {
+  res.clearCookie(sessionCookieName, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax'
+  });
+}
+
+function loginHtml(error = '') {
+  return `<!doctype html>
 <html lang="id">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Dashboard Terkunci</title>
+  <title>Login Admin Dashboard</title>
   <style>
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: system-ui, sans-serif; background: #f5f7f9; color: #17202a; padding: 20px; }
-    main { max-width: 420px; background: #fff; border: 1px solid #dfe5eb; border-radius: 8px; padding: 22px; }
-    h1 { margin: 0 0 10px; font-size: 20px; }
-    p { color: #637381; line-height: 1.5; }
-    code { background: #eef2f6; padding: 2px 5px; border-radius: 4px; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f7f9; color: #17202a; padding: 20px; }
+    main { width: min(420px, 100%); background: #fff; border: 1px solid #dfe5eb; border-radius: 8px; padding: 22px; }
+    h1 { margin: 0 0 6px; font-size: 21px; }
+    p { margin: 0 0 18px; color: #637381; line-height: 1.5; }
+    form { display: grid; gap: 12px; }
+    label { display: grid; gap: 5px; color: #637381; font-size: 12px; font-weight: 900; text-transform: uppercase; }
+    input, button { border: 1px solid #cfd8e3; border-radius: 6px; padding: 11px 12px; font: inherit; min-height: 42px; }
+    input { background: #fff; color: #17202a; }
+    button { cursor: pointer; background: #166534; color: #fff; border-color: #166534; font-weight: 800; }
+    .error { margin-bottom: 12px; padding: 10px 12px; border-radius: 6px; background: #fee2e2; color: #b42318; font-weight: 700; }
   </style>
 </head>
 <body>
   <main>
-    <h1>Dashboard terkunci</h1>
-    <p>Tambahkan token akses pada URL dashboard.</p>
-    <p><code>/?token=TOKEN_ANDA</code></p>
+    <h1>Login Admin</h1>
+    <p>Masuk untuk membuka dashboard online Toko Hasnawir.</p>
+    ${error ? `<div class="error">${error}</div>` : ''}
+    <form method="post" action="/login">
+      <label>Username<input name="username" autocomplete="username" required autofocus /></label>
+      <label>Password<input name="password" type="password" autocomplete="current-password" required /></label>
+      <button type="submit">Masuk</button>
+    </form>
   </main>
 </body>
-</html>`);
-  }
+</html>`;
+}
+
+function requireSyncToken(req, res, next) {
+  if (!syncToken) return next();
+  const auth = req.headers.authorization || '';
+  if (auth === `Bearer ${syncToken}`) return next();
   return res.status(401).json({ error: 'Token tidak valid.' });
+}
+
+function requireAdmin(req, res, next) {
+  if (!adminPassword || !sessionSecret) {
+    return res.status(503).type('html').send(loginHtml('ADMIN_PASSWORD atau SYNC_TOKEN belum diatur di Railway.'));
+  }
+
+  const session = readSession(req);
+  if (session?.username === adminUsername) return next();
+  if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Login admin diperlukan.' });
+  return res.redirect('/login');
 }
 
 async function initDb() {
@@ -334,6 +414,7 @@ function dashboardHtml() {
     .field label, .label { color: #637381; font-size: 11px; font-weight: 900; text-transform: uppercase; }
     input, select, button { border: 1px solid #cfd8e3; background: #fff; border-radius: 6px; padding: 9px 10px; font-weight: 700; min-height: 38px; }
     button { cursor: pointer; background: #166534; color: #fff; border-color: #166534; }
+    .logout { background: #fff; color: #b42318; border-color: #fecaca; }
     .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
     .two { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; }
     .card { background: #fff; border: 1px solid #dfe5eb; border-radius: 8px; padding: 14px; min-width: 0; }
@@ -364,6 +445,7 @@ function dashboardHtml() {
       <div class="field"><label for="date">Tanggal Shift</label><input type="date" id="date" /></div>
       <div class="field"><label for="shiftSelect">Pilih Shift / Kasir</label><select id="shiftSelect"></select></div>
       <button id="refresh">Refresh</button>
+      <form method="post" action="/logout"><button class="logout" type="submit">Keluar</button></form>
     </div>
   </header>
   <main>
@@ -380,7 +462,6 @@ function dashboardHtml() {
     <section class="card"><h3>Produk Terjual</h3><div id="items"></div></section>
   </main>
   <script>
-    const token = new URLSearchParams(location.search).get('token') || '';
     const rupiah = (value) => 'Rp ' + Number(value || 0).toLocaleString('id-ID');
     const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
     const today = new Date().toISOString().slice(0, 10);
@@ -423,8 +504,12 @@ function dashboardHtml() {
     async function load() {
       const date = document.getElementById('date').value || today;
       const shiftParam = selectedShiftId ? '&shift=' + encodeURIComponent(selectedShiftId) : '';
-      const res = await fetch('/api/dashboard?date=' + encodeURIComponent(date) + shiftParam + '&token=' + encodeURIComponent(token));
+      const res = await fetch('/api/dashboard?date=' + encodeURIComponent(date) + shiftParam);
       if (!res.ok) {
+        if (res.status === 401) {
+          location.href = '/login';
+          return;
+        }
         document.getElementById('generated').textContent = 'Gagal memuat data: ' + res.status;
         return;
       }
@@ -472,8 +557,25 @@ function dashboardHtml() {
 }
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
-app.get('/', requireToken, (_req, res) => res.type('html').send(dashboardHtml()));
-app.get('/api/dashboard', requireToken, async (req, res, next) => {
+app.get('/login', (req, res) => {
+  if (readSession(req)?.username === adminUsername) return res.redirect('/');
+  return res.type('html').send(loginHtml());
+});
+app.post('/login', (req, res) => {
+  const username = String(req.body.username || '');
+  const password = String(req.body.password || '');
+  if (username === adminUsername && password === adminPassword) {
+    setSessionCookie(res, username);
+    return res.redirect('/');
+  }
+  return res.status(401).type('html').send(loginHtml('Username atau password salah.'));
+});
+app.post('/logout', (_req, res) => {
+  clearSessionCookie(res);
+  return res.redirect('/login');
+});
+app.get('/', requireAdmin, (_req, res) => res.type('html').send(dashboardHtml()));
+app.get('/api/dashboard', requireAdmin, async (req, res, next) => {
   try {
     const shiftId = Number(req.query.shift || 0);
     res.json(await getDashboardData(req.query.date, Number.isFinite(shiftId) && shiftId > 0 ? shiftId : undefined));
@@ -482,7 +584,7 @@ app.get('/api/dashboard', requireToken, async (req, res, next) => {
   }
 });
 
-app.post('/api/sync/events', requireToken, async (req, res, next) => {
+app.post('/api/sync/events', requireSyncToken, async (req, res, next) => {
   try {
     const events = Array.isArray(req.body.events) ? req.body.events : [req.body];
     const results = [];

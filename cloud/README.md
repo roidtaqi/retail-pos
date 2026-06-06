@@ -9,16 +9,21 @@ Set variabel berikut di Railway:
 ```bash
 DATABASE_URL=postgresql://...
 SYNC_TOKEN=token-rahasia-yang-sama-dengan-aplikasi-kasir
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=password-admin-dashboard
+SESSION_SECRET=random-secret-panjang
 PORT=3000
 ```
 
 Railway biasanya mengisi `DATABASE_URL` dan `PORT` otomatis jika service PostgreSQL sudah ditambahkan.
+Jika `ADMIN_PASSWORD` belum diisi, dashboard sementara memakai `SYNC_TOKEN` sebagai password admin.
 
 ## Endpoint
 
 - `GET /health`
-- `GET /?token=SYNC_TOKEN`
-- `GET /api/dashboard?date=YYYY-MM-DD&shift=1&token=SYNC_TOKEN`
+- `GET /login`
+- `GET /`
+- `GET /api/dashboard?date=YYYY-MM-DD&shift=1`
 - `POST /api/sync/events` dengan header `Authorization: Bearer SYNC_TOKEN`
 
 ## Setelah Deploy
