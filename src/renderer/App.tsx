@@ -52,6 +52,7 @@ export default function App() {
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [completedSyncCount, setCompletedSyncCount] = useState(0);
   const [failedSyncCount, setFailedSyncCount] = useState(0);
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
 
   // Modal Dialog states
   const [activeModal, setActiveModal] = useState<
@@ -113,6 +114,18 @@ export default function App() {
       setPendingSyncCount(status.pendingCount);
       setCompletedSyncCount(status.completedCount);
       setFailedSyncCount(status.failedCount);
+      setAutoSyncEnabled(status.autoSyncEnabled ?? true);
+    });
+
+    (window as any).api.sync.getStatus().then((status: any) => {
+      setIsOnline(status.isOnline);
+      setIsSyncing(status.isSyncing);
+      setPendingSyncCount(status.pendingCount);
+      setCompletedSyncCount(status.completedCount);
+      setFailedSyncCount(status.failedCount);
+      setAutoSyncEnabled(status.autoSyncEnabled ?? true);
+    }).catch((err: any) => {
+      console.error('Error loading sync status:', err);
     });
 
     // Check if shift is open
@@ -788,6 +801,13 @@ export default function App() {
               <RefreshCw size={14} className={isSyncing ? 'spin-anim' : ''} />
               SYNC NOW
             </button>
+
+            <span
+              className={autoSyncEnabled ? 'badge badge-online' : 'badge badge-offline'}
+              title={autoSyncEnabled ? 'Auto-sync aktif: antrean akan dikirim otomatis.' : 'Auto-sync mati: gunakan Sync Queue secara manual.'}
+            >
+              <RefreshCw size={14} /> {autoSyncEnabled ? 'AUTO SYNC' : 'MANUAL SYNC'}
+            </span>
 
             <button 
               onClick={toggleFullScreen}

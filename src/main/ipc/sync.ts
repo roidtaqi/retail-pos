@@ -18,6 +18,10 @@ function getSetting(key: string, fallback = '') {
   return row?.value || fallback;
 }
 
+function isAutoSyncEnabled() {
+  return getSetting('sync_enabled', 'true') === 'true';
+}
+
 export function sendSyncStatus(window: BrowserWindow) {
   try {
     const pendingCountResult = db.prepare("SELECT COUNT(*) as count FROM sync_events WHERE status = 'pending'").get() as any;
@@ -30,6 +34,7 @@ export function sendSyncStatus(window: BrowserWindow) {
       pendingCount: pendingCountResult.count,
       failedCount: failedCountResult.count,
       completedCount: completedCountResult.count,
+      autoSyncEnabled: isAutoSyncEnabled(),
       lastSyncTime: new Date().toLocaleTimeString()
     });
   } catch (error) {
@@ -42,6 +47,10 @@ export function startSyncWorker(getWindow: () => BrowserWindow | null) {
   setInterval(async () => {
     const window = getWindow();
     if (!window || !isOnline || isSyncing) return;
+    if (!isAutoSyncEnabled()) {
+      sendSyncStatus(window);
+      return;
+    }
 
     try {
       const pendingCount = (db.prepare("SELECT COUNT(*) as count FROM sync_events WHERE status = 'pending'").get() as any).count;
@@ -157,8 +166,8 @@ async function performSync(window: BrowserWindow): Promise<SyncSummary> {
     console.error('Sync process failed:', error);
     db.prepare(`
       UPDATE sync_events 
-      SET status = 'failed', 
-          error_message = ?, 
+      SET attempts = attempts + 1,
+          error_message = ?,
           updated_at = CURRENT_TIMESTAMP 
       WHERE status = 'pending'
     `).run(error.message || 'Unknown network error');
@@ -186,6 +195,7 @@ ipcMain.handle('sync:getStatus', wrapIpcHandler(async () => {
   return {
     isOnline,
     isSyncing,
+    autoSyncEnabled: isAutoSyncEnabled(),
     pendingCount,
     failedCount,
     completedCount

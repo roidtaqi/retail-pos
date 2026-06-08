@@ -559,6 +559,12 @@ function seedData() {
     VALUES ('cloud_sync_token', '', CURRENT_TIMESTAMP)
     ON CONFLICT(key) DO NOTHING
   `).run();
+
+  db.prepare(`
+    INSERT INTO settings (key, value, updated_at)
+    VALUES ('sync_enabled', 'true', CURRENT_TIMESTAMP)
+    ON CONFLICT(key) DO NOTHING
+  `).run();
 }
 
 // Export database client for other query handlers

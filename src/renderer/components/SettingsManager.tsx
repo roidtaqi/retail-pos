@@ -466,15 +466,15 @@ export default function SettingsManager({ onClose, onRefresh }: SettingsManagerP
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <label style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Sync Background</label>
+                  <label style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Auto-Sync Cloud</label>
                   <select
                     value={syncEnabled}
                     onChange={(e) => setSyncEnabled(e.target.value)}
                     className="input-soft"
                     style={{ width: '100%', padding: '8px 12px', fontSize: '0.85rem', fontWeight: 700 }}
                   >
-                    <option value="true">AKTIF (Otomatis)</option>
-                    <option value="false">MATI (Manual)</option>
+                    <option value="true">AKTIF (Kirim Otomatis)</option>
+                    <option value="false">MATI (Sync Manual)</option>
                   </select>
                 </div>
 
@@ -490,6 +490,11 @@ export default function SettingsManager({ onClose, onRefresh }: SettingsManagerP
                     <option value="true">YA (Pusat DB Lokal)</option>
                   </select>
                 </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, color: 'var(--text-muted)', fontSize: '0.75rem', fontWeight: 700, lineHeight: 1.45 }}>
+                <Info size={16} />
+                Jika Auto-Sync Cloud aktif, transaksi dan shift pending akan dikirim otomatis selama Cloud Sync URL dan token sudah diisi.
               </div>
             </div>
 
